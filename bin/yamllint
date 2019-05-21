@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+
+const path = require('path');
+const nconf = require('nconf');
+const leprechaun = require('leprechaun');
+const snakeCase = require('lodash.snakecase');
+const glob = require('glob');
+const yamlLint = require('../yaml-lint');
+
+const options = {};
+
+nconf.argv({
+  "verbose": {
+    alias: 'v',
+    describe: 'Verbose log output',
+    default: false,
+    boolean: true
+  },
+
+}).env({
+  match: /^yamllint/i
+}).file({
+  file: path.resolve(process.cwd(), '.yaml-lint.json')
+});
+
+[
+  'schema',
+  'ignore',
+  'verbose'
+].forEach((key) => {
+  const env = snakeCase(key);
+  options[key] = nconf.get(key) || nconf.get(`yamllint_${env.toLowerCase()}`) || nconf.get(`YAMLLINT_${env.toUpperCase()}`);
+});
+
+const config = nconf.get();
+
+let files = [];
+
+(config._ || []).forEach((pattern) => {
+  files = files.concat(glob.sync(path.resolve(process.cwd(), "" + pattern), {
+    dot: true,
+    ignore: [].concat(config.ignore).filter(Boolean).map((item) => path.resolve(process.cwd(), "" + item)),
+    absolute: true
+  }));
+});
+
+if (files.length === 0) {
+
+  leprechaun.error('YAML Lint failed.');
+  leprechaun.error('No YAML files were found matching your selection.');
+  process.exit(1);
+
+} else {
+  let errors = [];
+
+  if (options.verbose) {
+    leprechaun.info("Testing " + files.length + " file(s)...");
+  }
+
+  Promise.all(
+    files.map((file) => yamlLint
+      .lintFile(file, options)
+      .then(() => {
+        if (options.verbose) {
+          leprechaun.success("OK:   " + file);
+        }
+      })
+      .catch((err) => {
+        err.file = file;
+        errors.push(err);
+
+        if (options.verbose) {
+          leprechaun.error("FAIL: " + file);
+        }
+      })
+    )
+  ).then(() => {
+    if (options.verbose) {
+      leprechaun();
+    }
+
+    if (errors.length === 0) {
+      leprechaun.success('YAML Lint successful.');
+    } else {
+      leprechaun.error(errors.length + " file(s) failed:");
+
+      errors.map((error, i) => {
+        leprechaun.error(`YAML Lint failed for ${error.file}:${error.line}`);
+        leprechaun.error(error.message);
+        if (i < errors.length - 1) leprechaun();
+      });
+
+      process.exit(1);
+    }
+  });
+}

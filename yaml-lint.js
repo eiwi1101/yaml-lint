@@ -17,6 +17,11 @@ function lint(content, opts) {
       });
       resolve();
     } catch (e) {
+      if (e.mark) {
+        e.line = e.mark.line + 1;
+        e.column = e.mark.column + 1;
+      }
+
       reject(e);
     }
   });

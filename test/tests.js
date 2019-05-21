@@ -31,3 +31,11 @@ tap.test('Missing file', (childTest) => {
     childTest.end();
   });
 });
+
+tap.test('Numeric Filename', (childTest) => {
+  yamlLint.lintFile(path.resolve(__dirname, '2')).then(() => {
+    childTest.end();
+  }).catch((e) => {
+    throw e;
+  });
+});

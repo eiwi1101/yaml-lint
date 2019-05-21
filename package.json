@@ -40,6 +40,5 @@
   },
   "preferGlobal": true,
   "bin": {
-    "yamllint": "cli.js"
-  }
+    "yamllint": "bin/yamllint"  }
 }
